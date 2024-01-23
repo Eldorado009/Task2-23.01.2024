@@ -1,80 +1,65 @@
-﻿//using System;
-//using System.Net.Http;
-//using System.Threading.Tasks;
-//using System.Data.SqlClient;
-//using System.Text.Json;
-//using ConsoleApp2;
-//using ConsoleApp2.Utilities.Exceptions;
+﻿using System;
+using System.Data.SqlClient;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using ConsoleApp2;
 
-//class Program
-//{
-//    static async Task Main()
-//    {
-//        Console.Write("Enter the ID: ");
-//        int id = int.Parse(Console.ReadLine());
+class Program
+{
+    static async Task Main()
+    {
+        Console.Write("Enter the ID to add to the database: ");
+        int idToAdd = int.Parse(Console.ReadLine());
 
-//        try
-//        {
-//            var apiObject = await GetFromApi(id);
-//            AddToDatabase(apiObject);
-//            Console.WriteLine("Object added to the database successfully.");
-//        }
-//        catch (ObjectAlreadyExistsException ex)
-//        {
-//            Console.WriteLine(ex.Message);
-//        }
-//        catch (Exception ex)
-//        {
-//            Console.WriteLine("An error occurred: " + ex.Message);
-//        }
-//    }
+        ApiObject apiObject = await GetObjectFromApi(idToAdd);
+        AddObjectToDatabase(apiObject, @"Server=MSI\SQLEXPRESS;Database=UsersDB;Trusted_Connection=true");
 
-//    static void AddToDatabase(ApiObject apiObject)
-//    {
-//        string connectionString = @"Server=MSI\\SQLEXPRESS;Database=UsersDB;Trusted_Connection=true;";
 
-//        if (CheckIfObjectExists(apiObject.Id, connectionString))
-//        {
-//            throw new ObjectAlreadyExistsException("Object already exists in the database.");
-//        }
+        Console.WriteLine("Press any key to exit.");
+        Console.ReadKey();
+    }
 
-//        InsertIntoDatabase(apiObject, connectionString);
-//    }
 
-//    static bool CheckIfObjectExists(int id, string connectionString)
-//    {
-//        using (SqlConnection connection = new SqlConnection(connectionString))
-//        {
-//            connection.Open();
+    private static async Task<ApiObject> GetObjectFromApi(int id)
+    {
+        using (HttpClient client = new HttpClient())
+        {
+            HttpResponseMessage response = await client.GetAsync($"https://jsonplaceholder.typicode.com/posts/{id}");
+            response.EnsureSuccessStatusCode();
 
-//            using (SqlCommand command = new SqlCommand("SELECT COUNT(*) FROM Shop Users Id = @Id", connection))
-//            {
-//                command.Parameters.AddWithValue("@Id", id);
+            string jsonString = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<ApiObject>(jsonString);
+        }
+    }
 
-//                int count = (int)command.ExecuteScalar();
+    private static void AddObjectToDatabase(ApiObject apiObject, string connectionString)
+    {
+        if (apiObject != null)
+        {
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
 
-//                return count > 0;
-//            }
-//        }
-//    }
+                using (SqlCommand command = new SqlCommand("INSERT INTO Users (Id, UserId, Title, Body) VALUES (@Id, @UserId, @Title, @Body)", connection))
+                {
+                    command.Parameters.AddWithValue("@Id", apiObject.Id);
+                    command.Parameters.AddWithValue("@UserId", apiObject.UserId);
+                    command.Parameters.AddWithValue("@Title", apiObject.Title);
+                    command.Parameters.AddWithValue("@Body", apiObject.Body);
 
-//    static void InsertIntoDatabase(ApiObject apiObject, string connectionString)
-//    {
-//        using (SqlConnection connection = new SqlConnection(connectionString))
-//        {
-//            connection.Open();
+                    command.ExecuteNonQuery();
+                }
+            }
 
-//            using (SqlCommand command = new SqlCommand("INSERT INTO Users (Id, Title, Body) VALUES (@Id, @Title, @Body)", connection))
-//            {
-//                command.Parameters.AddWithValue("@Id", apiObject.Id);
-//                command.Parameters.AddWithValue("@Title", apiObject.Title);
-//                command.Parameters.AddWithValue("@Body", apiObject.Body);
-
-//                command.ExecuteNonQuery();
-//            }
-//        }
-//    }
-//}
+            Console.WriteLine("Object added to the database successfully.");
+        }
+        else
+        {
+            Console.WriteLine("Object is null. Insertion into the database is not performed.");
+        }
+    }
+}
 
 
 
